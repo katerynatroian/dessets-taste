@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Експертне оцінювання: смаки тортиків</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="app-card">
@@ -17,22 +18,6 @@
           <h1>Оберіть ваші 3 найулюбленіші смаки тортиків</h1>
           <div id="app"></div>
           <button id="submit-btn" disabled>Оберіть 3 смаки</button>
-      </div>
-
-      <div id="password-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-          <h3>🔐 Доступ до адмін-панелі</h3>
-          <p>Будь ласка, введіть пароль адміністратора</p>
-          
-          <input type="password" id="admin-pass-input" placeholder="Пароль..." />
-          
-          <p id="modal-error-text" style="color: #d63031; font-size: 0.9em; margin-top: 5px; min-height: 1.2em;"></p>
-          
-          <div class="modal-actions">
-            <button id="modal-cancel">Скасувати</button>
-            <button id="modal-confirm">Увійти</button>
-          </div>
-        </div>
       </div>
   
       <div id="admin-section" class="hidden">
@@ -49,6 +34,17 @@
                       </thead>
                       <tbody id="admin-tbody"></tbody>
                   </table>
+              </div>
+          </div>
+          <div class="admin-ga-card">
+              <button id="calc-ranking">
+              Застосувати генетичний алгоритм
+              </button>
+          
+              <div id="ga-result"></div>
+          
+              <div class="chart-container">
+                <canvas id="fitnessChart"></canvas>
               </div>
           </div>
       </div>
