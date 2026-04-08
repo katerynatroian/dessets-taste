@@ -1,8 +1,8 @@
 import { db, collection, addDoc, serverTimestamp } from './firebase.js';
-import { getDocs, query, orderBy } from "firebase/firestore"; 
+import { getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore"; 
+import { AntRanking } from './aco.js';
 import './style.css';
 
-// 1. КОНСТАНТИ ТА СТАН
 const desserts = [
   "Шоколадний трюфель", "Полуниця-вершки", "Фісташка-малина",
   "Банан-карамель", "Снікерс", "Карамель-сіль",
@@ -13,12 +13,25 @@ const desserts = [
   "Фісташка-полуниця", "Кавовий"
 ];
 
+const heuristics = [
+    { id: 'E1', text: 'Об\'єкт був на 3 місці хоча б раз' },
+    { id: 'E2', text: 'Об\'єкт був на 2 місці хоча б раз' },
+    { id: 'E3', text: 'Об\'єкт був на 1 місці хоча б раз' },
+    { id: 'E4', text: 'Об\'єкт був двічі на 3 місці' },
+    { id: 'E5', text: 'Об\'єкт був на 3 місці та на 2 місці' },
+    { id: 'E6', text: 'Об\'єкт жодного разу не входив у топ-2' },
+    { id: 'E7', text: 'Об\'єкт має лише 1 згадку у всіх голосах' }
+];
+
 const expertId = localStorage.getItem("expert_id") || Math.floor(1000 + Math.random() * 9000).toString();
 localStorage.setItem("expert_id", expertId);
 
 let selected = []; 
+let selectedHeuristics = [];
+const heuristicsList = document.getElementById('heuristics-list');
+const submitHeuristicsBtn = document.getElementById('submit-heuristics-btn');
+let myChart = null; 
 
-// DOM Елементи
 const appDiv = document.querySelector('#app');
 const submitBtn = document.querySelector('#submit-btn');
 const tabVoting = document.getElementById('tab-voting');
@@ -27,441 +40,488 @@ const votingSection = document.getElementById('voting-section');
 const adminSection = document.getElementById('admin-section');
 const userDisplay = document.getElementById('user-display');
 
-userDisplay.innerText = `Експерт #${expertId}`;
-
+if (userDisplay) userDisplay.innerText = `Експерт #${expertId}`;
 
 const passwordModal = document.getElementById('password-modal');
 const passInput = document.getElementById('admin-pass-input');
 const confirmBtn = document.getElementById('modal-confirm');
 const cancelBtn = document.getElementById('modal-cancel');
 
-tabAdmin.onclick = () => {
-  switchTab('admin');
-  loadAdminData();
-};
+// --- ДІАГРАМА ---
+function updateChart(votesData) {
+    const canvas = document.getElementById('resultsChart');
+    if (!canvas) return;
+    const ChartLib = window.Chart;
+    if (!ChartLib) { console.error("Chart.js не знайдено."); return; }
 
-// 2. ЛОГІКА ТАБІВ (ПЕРЕМИКАННЯ)
-tabVoting.onclick = () => {
-    switchTab('voting');
-};
+    const scores = {};
+    desserts.forEach(city => scores[city] = 0);
+    votesData.forEach(vote => {
+        if (vote.ranking && Array.isArray(vote.ranking)) {
+            if (vote.ranking[0]) scores[vote.ranking[0]] += 3;
+            if (vote.ranking[1]) scores[vote.ranking[1]] += 2;
+            if (vote.ranking[2]) scores[vote.ranking[2]] += 1;
+        }
+    });
 
+    const sortedLabels = Object.keys(scores).filter(city => scores[city] > 0).sort((a, b) => scores[b] - scores[a]);
+    const sortedData = sortedLabels.map(label => scores[label]);
 
-function switchTab(target) {
-    if (target === 'voting') {
-        tabVoting.classList.add('active');
-        tabAdmin.classList.remove('active');
-        votingSection.classList.remove('hidden');
-        adminSection.classList.add('hidden');
-    } else {
-        tabAdmin.classList.add('active');
-        tabVoting.classList.remove('active');
-        adminSection.classList.remove('hidden');
-        votingSection.classList.add('hidden');
+    if (myChart) myChart.destroy();
+
+    myChart = new ChartLib(canvas, {
+        type: 'bar',
+        data: {
+            labels: sortedLabels,
+            datasets: [{ label: 'Рейтингові бали', data: sortedData, backgroundColor: '#6c5ce7', borderRadius: 8 }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+}
+
+// --- ЕВРИСТИКИ (вкладка голосування) ---
+function renderHeuristics() {
+    if (!heuristicsList) return;
+    heuristicsList.innerHTML = '';
+    heuristics.forEach(h => {
+        const isSelected = selectedHeuristics.includes(h.id);
+        const div = document.createElement('div');
+        div.className = `heuristic-card ${isSelected ? 'active' : ''}`;
+        div.innerHTML = `<strong>${h.id}</strong><p>${h.text}</p>`;
+        div.onclick = () => handleHeuristicSelect(h.id);
+        heuristicsList.appendChild(div);
+    });
+    if (submitHeuristicsBtn) {
+        const count = selectedHeuristics.length;
+        submitHeuristicsBtn.disabled = count < 2 || count > 3;
+        submitHeuristicsBtn.innerText = `Відправити (${count})`;
     }
 }
 
-// 3. ФУНКЦІЇ ГОЛОСУВАННЯ
+function handleHeuristicSelect(id) {
+    const index = selectedHeuristics.indexOf(id);
+    if (index !== -1) {
+        selectedHeuristics.splice(index, 1);
+    } else {
+        if (selectedHeuristics.length < 3) selectedHeuristics.push(id);
+        else showToast("Можна обрати не більше 3-х", "error");
+    }
+    renderHeuristics();
+}
+
+// --- ТАБИ ТА ПАРОЛЬ ---
+tabAdmin.onclick = () => { passwordModal.classList.remove('hidden'); passInput.value = ''; passInput.focus(); };
+const closeModal = () => passwordModal.classList.add('hidden');
+cancelBtn.onclick = closeModal;
+
+const checkPassword = () => {
+    if (passInput.value === "2903") {
+        closeModal(); switchTab('admin'); loadAdminData();
+    } else {
+        passInput.style.borderColor = "#d63031";
+        setTimeout(() => passInput.style.borderColor = "#eee", 1000);
+    }
+};
+confirmBtn.onclick = checkPassword;
+passInput.onkeydown = (e) => { if (e.key === 'Enter') checkPassword(); };
+passwordModal.onclick = (e) => { if (e.target === passwordModal) closeModal(); };
+tabVoting.onclick = () => switchTab('voting');
+
+window.switchTab = (target) => {
+    const votingSec = document.getElementById('voting-section');
+    const heuristicsSec = document.getElementById('heuristics-vote-section');
+    const adminSec = document.getElementById('admin-section');
+    document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+
+    if (target === 'voting') {
+        votingSec?.classList.remove('hidden');
+        heuristicsSec?.classList.add('hidden');
+        adminSec?.classList.add('hidden');
+        document.getElementById('tab-voting')?.classList.add('active');
+    } else if (target === 'heuristics') {
+        votingSec?.classList.add('hidden');
+        heuristicsSec?.classList.remove('hidden');
+        adminSec?.classList.add('hidden');
+        document.getElementById('tab-heuristics')?.classList.add('active');
+        renderHeuristics();
+    } else if (target === 'admin') {
+        adminSec?.classList.remove('hidden');
+        votingSec?.classList.add('hidden');
+        heuristicsSec?.classList.add('hidden');
+        document.getElementById('tab-admin')?.classList.add('active');
+    }
+};
+
+const tabHeuristics = document.getElementById('tab-heuristics');
+if (tabHeuristics) tabHeuristics.onclick = () => switchTab('heuristics');
+
+// --- ГОЛОСУВАННЯ ---
 function render() {
-  appDiv.innerHTML = '';
-  desserts.forEach(name => {
-    const rankIndex = selected.indexOf(name);
-    const btn = document.createElement('button');
-    btn.className = `dessert-card ${rankIndex !== -1 ? 'active' : ''}`;
-    
-    btn.innerHTML = `
-      <span class="item-name">${name}</span> 
-      ${rankIndex !== -1 ? `<span class="rank-badge">${rankIndex + 1}</span>` : ''}
-    `;
-
-    btn.onclick = () => handleSelect(name);
-    appDiv.appendChild(btn);
-  });
-
-  submitBtn.disabled = selected.length !== 3;
-  submitBtn.innerText = selected.length === 3 ? "🚀 Надіслати свій топ-3" : `Оберіть ще ${3 - selected.length}`;
+    appDiv.innerHTML = '';
+    desserts.forEach(name => {
+        const rankIndex = selected.indexOf(name);
+        const btn = document.createElement('button');
+        btn.className = `dessert-card ${rankIndex !== -1 ? 'active' : ''}`;
+        btn.innerHTML = `
+            <span class="item-name">${name}</span>
+            ${rankIndex !== -1 ? `<span class="rank-badge">${rankIndex + 1}</span>` : ''}
+        `;
+        btn.onclick = () => handleSelect(name);
+        appDiv.appendChild(btn);
+    });
+    submitBtn.disabled = selected.length !== 3;
+    submitBtn.innerText = selected.length === 3 ? "Надіслати свій топ-3" : `Оберіть ще ${3 - selected.length}`;
 }
 
 function handleSelect(name) {
-  const index = selected.indexOf(name);
-  if (index !== -1) {
-    selected.splice(index, 1); 
-  } else if (selected.length < 3) {
-    selected.push(name); 
-  }
-  render();
-}
-
-// Функція для відображення повідомлень
-function showToast(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <span>${type === 'success' ? '✨' : '❌'}</span>
-    <span>${message}</span>
-  `;
-  
-  container.appendChild(toast);
-
-  // Видалення через 3 секунди
-  setTimeout(() => {
-    toast.classList.add('fade-out');
-    setTimeout(() => toast.remove(), 400);
-  }, 3000);
-}
-
-// Оновлений обробник кнопки
-submitBtn.onclick = async () => {
-  try {
-    submitBtn.disabled = true;
-    const originalText = submitBtn.innerText;
-    submitBtn.innerText = "Зберігання...";
-
-    await addDoc(collection(db, "votes"), {
-      expert_id: expertId,
-      username: `Експерт #${expertId}`,
-      ranking: selected,
-      timestamp: serverTimestamp(),
-      action: `Проголосував: 1-${selected[0]}, 2-${selected[1]}, 3-${selected[2]}`
-    });
-
-    // Замість alert використовуємо нашу нову функцію
-    showToast("Дякуємо! Ваш вибір успішно збережено.");
-    
-    selected = [];
+    const index = selected.indexOf(name);
+    if (index !== -1) selected.splice(index, 1);
+    else if (selected.length < 3) selected.push(name);
     render();
-  } catch (e) {
-    console.error(e);
-    showToast("Сталася помилка при відправці", "error");
-    submitBtn.disabled = false;
-  }
+}
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✨' : '❌'}</span><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 400); }, 3000);
+}
+
+submitBtn.onclick = async () => {
+    try {
+        submitBtn.disabled = true;
+        await addDoc(collection(db, "votes"), {
+            expert_id: expertId,
+            username: `Експерт #${expertId}`,
+            ranking: selected,
+            timestamp: serverTimestamp()
+        });
+        showToast("Дякуємо! Ваш вибір збережено.");
+        selected = [];
+        render();
+    } catch (e) {
+        console.error(e);
+        showToast("Помилка", "error");
+        submitBtn.disabled = false;
+    }
 };
-// 4. ЛОГІКА АДМІНКИ (ПРОТОКОЛ)
+
+window.deleteVote = async function(id) {
+    if (confirm("Видалити цей результат?")) {
+        try {
+            await deleteDoc(doc(db, "votes", id));
+            showToast("Запис видалено");
+            loadAdminData();
+        } catch (e) {
+            showToast("Помилка видалення", "error");
+        }
+    }
+};
+
+// --- ДОПОМІЖНА ФУНКЦІЯ: чи підпадає об'єкт під евристику ---
+function matchesHeuristic(hId, stat) {
+    if (hId === 'E1') return stat.pos3 > 0;
+    if (hId === 'E2') return stat.pos2 > 0;
+    if (hId === 'E3') return stat.pos1 > 0;
+    if (hId === 'E4') return stat.pos3 >= 2;
+    if (hId === 'E5') return stat.pos3 > 0 && stat.pos2 > 0;
+    if (hId === 'E6') return stat.pos1 === 0 && stat.pos2 === 0;
+    if (hId === 'E7') return stat.total === 1;
+    return false;
+}
+
+// --- АДМІНКА ---
 async function loadAdminData() {
+    const container = document.getElementById('lab2-analysis-container');
     const tbody = document.getElementById('admin-tbody');
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Завантаження протоколу...</td></tr>';
+    if (!container || !tbody) return;
+
+    container.innerHTML = '<p>Обробка аналітичних даних...</p>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Завантаження...</td></tr>';
 
     try {
-        const q = query(collection(db, "votes"), orderBy("timestamp", "desc"));
-        const querySnapshot = await getDocs(q);
-        
-        tbody.innerHTML = ''; 
+        const snap1 = await getDocs(query(collection(db, "votes"), orderBy("timestamp", "desc")));
+        const snap2 = await getDocs(query(collection(db, "votes_lab2"), orderBy("timestamp", "desc")));
 
-        if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Голосів ще немає</td></tr>';
-            return;
-        }
+        const scores = {};
+        const dessertStats = {};
+        desserts.forEach(city => {
+            scores[city] = 0;
+            dessertStats[city] = { pos1: 0, pos2: 0, pos3: 0, total: 0 };
+        });
 
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            // Форматування дати
+        const hCounts = {};
+        heuristics.forEach(h => hCounts[h.id] = 0);
+
+        // 2. Обробка голосів Лаб 1
+        const allVotes = [];
+        tbody.innerHTML = '';
+        snap1.forEach(docSnap => {
+            const data = docSnap.data();
+            allVotes.push(data);
+
             const date = data.timestamp ? data.timestamp.toDate().toLocaleString('uk-UA') : 'Щойно';
-            
             const tr = document.createElement('tr');
-            tr.className = 'table-row';
             tr.innerHTML = `
-                <td><span class="admin-id-badge">ID: ${data.expert_id}</span></td>
-                <td>
-                    <div class="admin-choices">
-                        <span class="choice-item">🥇 ${data.ranking[0]}</span>
-                        <span class="choice-item">🥈 ${data.ranking[1]}</span>
-                        <span class="choice-item">🥉 ${data.ranking[2]}</span>
-                    </div>
-                </td>
-                <td class="time-cell">${date}</td>
+                <td>ID: ${data.expert_id}</td>
+                <td>${data.ranking.join(', ')}</td>
+                <td>${date}</td>
+                <td><button onclick="deleteVote('${docSnap.id}')">🗑️</button></td>
             `;
             tbody.appendChild(tr);
+
+            if (data.ranking && Array.isArray(data.ranking)) {
+                const r = data.ranking;
+                if (r[0]) { scores[r[0]] += 3; dessertStats[r[0]].pos1++; dessertStats[r[0]].total++; }
+                if (r[1]) { scores[r[1]] += 2; dessertStats[r[1]].pos2++; dessertStats[r[1]].total++; }
+                if (r[2]) { scores[r[2]] += 1; dessertStats[r[2]].pos3++; dessertStats[r[2]].total++; }
+            }
         });
+
+        // 3. Протокол евристик
+        let lab2Html = '<h3>Протокол вибору евристик (Лабораторна №2)</h3><table class="results-table"><thead><tr><th>Експерт</th><th>Обрані евристики</th></tr></thead><tbody>';
+        snap2.forEach(d => {
+            const data = d.data();
+            lab2Html += `<tr><td>${data.expert_id}</td><td>${data.chosenHeuristics.join(', ')}</td></tr>`;
+            data.chosenHeuristics.forEach(id => { if (hCounts[id] !== undefined) hCounts[id]++; });
+        });
+        lab2Html += '</tbody></table>';
+
+        // 4. Рейтинг евристик за популярністю
+        let heuristicsPopHtml = '<h3>Рейтинг евристик за популярністю</h3><table class="results-table"><thead><tr><th>ID</th><th>Зміст</th><th>Голоси</th></tr></thead><tbody>';
+        const sortedHeuristics = heuristics.map(h => ({ ...h, count: hCounts[h.id] })).sort((a, b) => b.count - a.count);
+        sortedHeuristics.forEach(h => {
+            heuristicsPopHtml += `<tr><td><b>${h.id}</b></td><td>${h.text}</td><td>${h.count}</td></tr>`;
+        });
+        heuristicsPopHtml += '</tbody></table>';
+
+        // 4.1. Матриця переваг ТОП-10
+        const top10ForMatrix = desserts.map(name => ({ name, score: scores[name] })).sort((a, b) => b.score - a.score).slice(0, 10);
+        const matrixNames = top10ForMatrix.map(item => item.name);
+
+        let matrixHtml = '<h3>Матриця суміжних переваг (ТОП-10 смаків)</h3><div style="overflow-x: auto;"><table class="results-table" style="text-align: center;"><thead><tr><th>Смак / №</th>';
+        matrixNames.forEach((_, i) => matrixHtml += `<th style="text-align: center;">${i + 1}</th>`);
+        matrixHtml += '</tr></thead><tbody>';
+
+        matrixNames.forEach((nameA, i) => {
+            matrixHtml += `<tr><td style="text-align: left; white-space: nowrap;"><b>${i + 1}. ${nameA}</b></td>`;
+            matrixNames.forEach((nameB, j) => {
+                if (i === j) {
+                    matrixHtml += '<td style="background: #f1f2f6; color: #ccc;">-</td>';
+                } else {
+                    let count = 0;
+                    allVotes.forEach(vote => {
+                        const posA = vote.ranking.indexOf(nameA);
+                        const posB = vote.ranking.indexOf(nameB);
+                        if (posA !== -1 && (posB === -1 || posA < posB)) count++;
+                    });
+                    const cellStyle = count >= 3 ? 'style="font-weight: bold; color: #6c5ce7; background: #f9f9ff;"' : '';
+                    matrixHtml += `<td ${cellStyle}>${count}</td>`;
+                }
+            });
+            matrixHtml += '</tr>';
+        });
+        matrixHtml += '</tbody></table></div>';
+
+        // 5. Таблиці по кожній евристиці — показуємо тих, хто ЗАЛИШИВСЯ після відсіву
+        const top3H = sortedHeuristics.slice(0, 3).map(h => h.id);
+
+        let heuristicsResultsHtml = '<h3>Результати по кожній евристиці</h3>' +
+            '<p style="font-size:0.9rem; color:#555; margin-bottom:16px;">' +
+            'Кожна евристика <b>виключає</b> об\'єкти, що підпадають під її умову. ' +
+            'Таблиця показує тих, хто <b>залишився</b> після відсіву, відсортованих за балом.</p>';
+
+        heuristics.forEach(h => {
+            // Залишаємо лише тих, хто НЕ підпадає під евристику
+            const survived = desserts
+                .filter(name => !matchesHeuristic(h.id, dessertStats[name]))
+                .map(name => ({
+                    name,
+                    score: scores[name],
+                    stats: dessertStats[name]
+                }))
+                .sort((a, b) => b.score - a.score);
+
+            const excluded = desserts.length - survived.length;
+
+            heuristicsResultsHtml += `
+                <h4>${h.id}: ${h.text}</h4>
+                <p style="font-size:0.85rem; color:#666; margin: -8px 0 8px;">
+                    Відсіяно: <b style="color:#d63031;">${excluded}</b> &nbsp;|&nbsp;
+                    Залишилось: <b style="color:#00b894;">${survived.length}</b> з ${desserts.length}
+                </p>
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Об'єкт</th>
+                            <th>Бал</th>
+                            <th>1-е</th>
+                            <th>2-е</th>
+                            <th>3-є</th>
+                            <th>Згадок</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            if (survived.length === 0) {
+                heuristicsResultsHtml += `
+                    <tr>
+                        <td colspan="7" style="text-align:center; color:#999; font-style:italic;">
+                            Всі об'єкти відсіяні цією евристикою
+                        </td>
+                    </tr>`;
+            } else {
+                survived.forEach((item, i) => {
+                    heuristicsResultsHtml += `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td><b>${item.name}</b></td>
+                            <td>${item.score}</td>
+                            <td>${item.stats.pos1}</td>
+                            <td>${item.stats.pos2}</td>
+                            <td>${item.stats.pos3}</td>
+                            <td>${item.stats.total}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            heuristicsResultsHtml += '</tbody></table>';
+        });
+
+        // 5.1. Підмножина переможців — послідовне застосування ТОП-3 евристик
+        let currentSet = [...desserts];
+        let winnersHtml = `<h3>Підмножина переможців (послідовний відсів ТОП-3 евристик)</h3>
+            <p style="font-size:0.85rem; color:#555; margin-bottom:12px;">
+                Евристики застосовуються одна за одною: <b>${top3H.join(' → ')}</b>
+            </p>`;
+
+        top3H.forEach((hId, step) => {
+            const hText = heuristics.find(h => h.id === hId)?.text || '';
+            const before = currentSet.length;
+            currentSet = currentSet.filter(name => !matchesHeuristic(hId, dessertStats[name]));
+            const after = currentSet.length;
+
+            winnersHtml += `
+                <p style="font-size:0.85rem; color:#636e72; margin: 8px 0 4px;">
+                    <b>Крок ${step + 1} — ${hId}:</b> ${hText}<br>
+                    Було: ${before} → Залишилось: <b>${after}</b> (відсіяно: ${before - after})
+                </p>`;
+        });
+
+        const winners = currentSet
+            .map(name => ({ name, score: scores[name] }))
+            .sort((a, b) => b.score - a.score);
+
+        winnersHtml += `
+            <table class="results-table">
+                <thead><tr><th>№</th><th>Об'єкт</th><th>Бал</th></tr></thead>
+                <tbody>
+        `;
+        if (winners.length === 0) {
+            winnersHtml += `<tr><td colspan="3" style="text-align:center; color:#999;">Всі об'єкти відсіяні</td></tr>`;
+        } else {
+            winners.forEach((w, i) => {
+                winnersHtml += `<tr><td>${i + 1}</td><td><b>${w.name}</b></td><td>${w.score}</td></tr>`;
+            });
+        }
+        winnersHtml += '</tbody></table>';
+
+        // 6. Мурашиний алгоритм (ACO)
+        const expertVotes = allVotes.map(v => v.ranking).filter(r => r);
+        const winnersNames = winners.map(w => w.name);
+        let acoHtml = '';
+
+        if (winnersNames.length > 0) {
+            const aco = new AntRanking(winnersNames, expertVotes);
+            const { best, history } = aco.solve();
+
+            acoHtml += '<h3>Фінальний консенсус-рейтинг (ACO)</h3>' +
+                '<table class="results-table"><thead><tr><th>Місце</th><th>Об\'єкт</th></tr></thead><tbody>';
+            best.forEach((name, i) => {
+                acoHtml += `<tr><td><b>#${i + 1}</b></td><td>${name}</td></tr>`;
+            });
+            acoHtml += '</tbody></table>';
+
+            acoHtml += '<h3>Графік збіжності мурашиного алгоритму</h3>' +
+                '<div style="height:300px; width:100%; margin-bottom: 50px;"><canvas id="acoChart"></canvas></div>';
+
+            setTimeout(() => {
+                const acoCtx = document.getElementById('acoChart').getContext('2d');
+                new Chart(acoCtx, {
+                    type: 'line',
+                    data: {
+                        labels: history.map((_, i) => i + 1),
+                        datasets: [{
+                            label: 'Відстань (Якість)',
+                            data: history,
+                            borderColor: '#e17055',
+                            backgroundColor: 'rgba(225, 112, 85, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }, 200);
+        }
+
+        // 7. Фінальний вивід
+        container.innerHTML =
+            lab2Html +              // Протокол евристик
+            heuristicsPopHtml +     // Рейтинг популярності евристик
+            heuristicsResultsHtml + // Таблиці по кожній евристиці (залишені після відсіву)
+            winnersHtml +           // Послідовний відсів ТОП-3 евристик
+            matrixHtml +            // Матриця переваг
+            acoHtml;                // ACO + графік
+
+        updateChart(allVotes);
+
     } catch (e) {
-        console.error("Firebase Error: ", e);
-        tbody.innerHTML = '<tr><td colspan="3" style="color:red; text-align:center">Помилка доступу до бази даних</td></tr>';
+        console.error("Помилка аналітики: ", e);
+        container.innerHTML = '<p style="color:red">Помилка аналізу.</p>';
     }
 }
 
+// --- ВІДПРАВКА ЕВРИСТИК (ЛАБ 2) ---
+if (submitHeuristicsBtn) {
+    submitHeuristicsBtn.onclick = async () => {
+        try {
+            submitHeuristicsBtn.disabled = true;
+            submitHeuristicsBtn.innerText = "Відправка...";
 
+            await addDoc(collection(db, "votes_lab2"), {
+                expert_id: expertId,
+                username: `Експерт #${expertId}`,
+                chosenHeuristics: selectedHeuristics,
+                timestamp: serverTimestamp()
+            });
 
+            showToast("Евристики для Лаб 2 успішно збережено!");
+            selectedHeuristics = [];
 
-// --- ЕВРИСТИЧНЕ СКОРОЧЕННЯ СПИСКУ (E1-E8) ---
-function applyHeuristics(votes, allDesserts) {
-  let currentDesserts = [...allDesserts];
-  const TARGET_COUNT = 12;
+            setTimeout(() => {
+                switchTab('voting');
+                renderHeuristics();
+            }, 1000);
 
-  const getStats = (list) => {
-      const stats = {};
-      list.forEach(d => stats[d] = { p1: 0, p2: 0, p3: 0, totalVotes: 0 });
-      
-      votes.forEach(vote => {
-          vote.forEach((name, index) => {
-              if (stats[name]) {
-                  if (index === 0) stats[name].p1++;
-                  if (index === 1) stats[name].p2++;
-                  if (index === 2) stats[name].p3++;
-                  stats[name].totalVotes++;
-              }
-          });
-      });
-      return stats;
-  };
-
-  const heuristics = [
-      { id: "E1", check: (s) => s.totalVotes === 1 && s.p3 === 1 },
-      { id: "E2", check: (s) => s.totalVotes === 1 && s.p2 === 1 },
-      { id: "E3", check: (s) => s.totalVotes === 1 && s.p1 === 1 },
-      { id: "E4", check: (s) => s.totalVotes === 2 && s.p3 === 2 },
-      { id: "E5", check: (s) => s.totalVotes === 2 && s.p3 === 1 && s.p2 === 1 },
-      { id: "E6", check: (s) => s.totalVotes === 2 && s.p2 === 2 },
-      { id: "E7", check: (s) => s.totalVotes === 3 && s.p3 === 2 && s.p2 === 1 },
-      { id: "E8", check: (s) => s.totalVotes === 3 && s.p3 === 3 } 
-  ];
-
-  for (let rule of heuristics) {
-      if (currentDesserts.length <= TARGET_COUNT) break;
-
-      const stats = getStats(currentDesserts);
-      const candidatesToRemove = currentDesserts.filter(d => rule.check(stats[d]));
-      
-      if (candidatesToRemove.length > 0) {
-          const canRemoveCount = currentDesserts.length - TARGET_COUNT;
-          const actualToRemove = candidatesToRemove.slice(0, canRemoveCount);
-          currentDesserts = currentDesserts.filter(d => !actualToRemove.includes(d));
-          console.log(`Правило ${rule.id} видалило об'єктів: ${actualToRemove.length}`);
-      }
-  }
-
-  // ЯКЩО ВСЕ ОДНО > 12: Додаємо "Запобіжник" за сумарним рейтингом (найменша кількість 1-х місць)
-  /*if (currentDesserts.length > TARGET_COUNT) {
-      console.warn("Евристики E1-E8 не дали 12 елементів. Застосовуємо фінальне відсікання за кількістю 1-х місць.");
-      const stats = getStats(currentDesserts);
-      currentDesserts.sort((a, b) => stats[a].p1 - stats[b].p1); 
-      
-      const toRemoveCount = currentDesserts.length - TARGET_COUNT;
-      currentDesserts.splice(0, toRemoveCount);
-  }*/
-
-  return currentDesserts;
-}
-
-// ===============================
-// ГЕНЕТИЧНИЙ АЛГОРИТМ
-// ===============================
-
-function geneticRanking(votes, availableDesserts){
-
-  const populationSize = 60;
-  const generations = 150;
-  const mutationRate = 0.1;
-
-  const history = [];
-
-  function randomChromosome(){
-
-    const shuffled = [...availableDesserts].sort(()=>Math.random()-0.5);
-
-    return shuffled.slice(0,3);
-
-  }
-
-  function fitness(chromosome){
-
-    let score = 0;
-
-    votes.forEach(vote=>{
-
-      vote.forEach((dessert,index)=>{
-
-        const pos = chromosome.indexOf(dessert);
-
-        if(pos !== -1){
-
-          score += 3 - Math.abs(index - pos);
-
+        } catch (e) {
+            console.error("Error saving heuristics: ", e);
+            showToast("Помилка при відправці", "error");
+            submitHeuristicsBtn.disabled = false;
+            submitHeuristicsBtn.innerText = `Відправити (${selectedHeuristics.length})`;
         }
-
-      });
-
-    });
-
-    return score;
-  }
-
-  function crossover(parent1,parent2){
-
-    const child = [];
-
-    parent1.forEach(d=>{
-      if(!child.includes(d) && child.length<3)
-        child.push(d);
-    });
-
-    parent2.forEach(d=>{
-      if(!child.includes(d) && child.length<3)
-        child.push(d);
-    });
-
-    return child.slice(0,3);
-  }
-
-  function mutate(chromosome){
-
-    if(Math.random() < mutationRate){
-
-      const randomDessert =
-      availableDesserts[Math.floor(Math.random()*availableDesserts.length)];
-
-      chromosome[Math.floor(Math.random()*3)] = randomDessert;
-
-    }
-
-    return [...new Set(chromosome)].slice(0,3);
-  }
-
-  let population = Array.from(
-    {length: populationSize},
-    randomChromosome
-  );
-
-  for(let g=0; g<generations; g++){
-
-    population.sort((a,b)=>fitness(b)-fitness(a));
-
-    const bestFitness = fitness(population[0]);
-
-    history.push(bestFitness);
-
-    const newPopulation = population.slice(0,10);
-
-    while(newPopulation.length < populationSize){
-
-      const p1 = population[Math.floor(Math.random()*20)];
-      const p2 = population[Math.floor(Math.random()*20)];
-
-      let child = crossover(p1,p2);
-
-      child = mutate(child);
-
-      newPopulation.push(child);
-
-    }
-
-    population = newPopulation;
-
-  }
-
-  population.sort((a,b)=>fitness(b)-fitness(a));
-
-  return {
-    best: population[0],
-    history: history
-  };
+    };
 }
 
-
-function drawChart(history){
-
-  const ctx = document
-  .getElementById("fitnessChart")
-  .getContext("2d");
-
-  new Chart(ctx,{
-
-    type:"line",
-
-    data:{
-      labels: history.map((_,i)=>i+1),
-
-      datasets:[{
-        label:"Fitness еволюції",
-
-        data:history,
-
-        borderColor:"rgb(255,105,180)",
-
-        fill:false,
-
-        tension:0.1
-      }]
-    },
-
-    options:{
-      responsive:true,
-
-      plugins:{
-        legend:{display:true}
-      },
-
-      scales:{
-        x:{
-          title:{
-            display:true,
-            text:"Покоління"
-          }
-        },
-
-        y:{
-          title:{
-            display:true,
-            text:"Fitness"
-          }
-        }
-      }
-    }
-
-  });
-
-}
-
-
-// Оновлена функція для кнопки розрахунку
-async function calculateOptimalRanking() {
-  const resultDiv = document.getElementById("ga-result");
-  resultDiv.innerHTML = "⏳ Отримання даних з бази та фільтрація...";
-
-  const q = query(collection(db, "votes"));
-  const snapshot = await getDocs(q);
-  const votes = [];
-  snapshot.forEach(doc => votes.push(doc.data().ranking));
-
-  if (votes.length === 0) {
-      resultDiv.innerHTML = "Помилка: Немає голосів для аналізу";
-      return;
-  }
-
-  // 1. Скорочення списку за евристиками
-  const reducedList = applyHeuristics(votes, desserts);
-
-  // 2. Вивід результатів скорочення
-  let reducedHtml = `
-      <div class="heuristic-log" style="background: #f0fdf4; border: 1px solid #16a34a; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-          <h4 style="margin-top:0">✅ Список скорочено (Евристики E1-E8)</h4>
-          <p>Залишилось смаків: <b>${reducedList.length}</b></p>
-          <ul style="column-count: 2; font-size: 0.9em; padding-left: 20px;">
-              ${reducedList.map(d => `<li>${d}</li>`).join('')}
-          </ul>
-      </div>
-  `;
-  resultDiv.innerHTML = reducedHtml;
-
-  // 3. Запуск ГА на залишку
-  const result = geneticRanking(votes, reducedList);
-  const best = result.best;
-
-  resultDiv.innerHTML += `
-      <div class="ga-output">
-          <h3>🧬 Результат генетичного алгоритму</h3>
-          <div class="ga-ranking" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-              <div style="font-size: 1.1em; margin-bottom: 5px;">🥇 <b>${best[0]}</b></div>
-              <div style="font-size: 1.1em; margin-bottom: 5px;">🥈 <b>${best[1]}</b></div>
-              <div style="font-size: 1.1em;">🥉 <b>${best[2]}</b></div>
-          </div>
-      </div>
-  `;
-
-  drawChart(result.history);
-}
-
-// Прив'язка до кнопки
-document.getElementById("calc-ranking").onclick = calculateOptimalRanking;
-
-// Початковий запуск
 render();

@@ -9,19 +9,45 @@
 <body>
     <div class="app-card">
       <nav class="nav-tabs">
-          <button id="tab-voting" class="active">🗳️ Голосування</button>
-          <button id="tab-admin">🔐 Адмінка</button>
+          <button id="tab-voting" class="active">Лаб 1: Голосування</button>
+          <button id="tab-heuristics">Лаб 2: Евристики</button>
+          <button id="tab-admin">Адмінка</button>
       </nav>
   
       <div id="voting-section">
           <div class="user-badge" id="user-display">Завантаження...</div>
-          <h1>Оберіть ваші 3 найулюбленіші смаки тортиків</h1>
+          <h1>Оберіть ваші 3 міста київської області</h1>
           <div id="app"></div>
-          <button id="submit-btn" disabled>Оберіть 3 смаки</button>
+          <button id="submit-btn" disabled>Оберіть 3 міста</button>
+      </div>
+
+      <section id="heuristics-vote-section" class="hidden">
+          <h1>Лаб 2: Вибір евристик для відсіювання</h1>
+          <p>Оберіть 2-3 евристики, які слід застосувати першими</p>
+          <div id="heuristics-list" class="heuristics-grid"></div>
+          <button id="submit-heuristics-btn" disabled>Відправити вибір евристик</button>
+      </section>
+
+      <div id="password-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+          <h3>Доступ до адмін-панелі</h3>
+          <p>Будь ласка, введіть пароль адміністратора</p>
+          <input type="password" id="admin-pass-input" placeholder="Пароль..." />
+          <div class="modal-actions">
+            <button id="modal-cancel">Скасувати</button>
+            <button id="modal-confirm">Увійти</button>
+          </div>
+        </div>
       </div>
   
       <div id="admin-section" class="hidden">
-          <h2>📜 Протокол дій експертів</h2>
+          <h2>Протокол дій експертів</h2>
+          <div id="lab2-analysis-container"></div>
+
+          <div style="position: relative; width: 100%; height: 400px; background: white; padding: 20px; border-radius: 20px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+              <canvas id="resultsChart"></canvas>
+          </div>
+
           <div class="table-card">
               <div class="table-wrapper">
                   <table>
@@ -30,30 +56,22 @@
                               <th>Експерт</th>
                               <th>Вибір (1-3 місця)</th>
                               <th>Дата та час</th>
+                              <th>Дія</th> 
                           </tr>
                       </thead>
                       <tbody id="admin-tbody"></tbody>
                   </table>
               </div>
           </div>
-          <div class="admin-ga-card">
-              <button id="calc-ranking">
-              Застосувати генетичний алгоритм
-              </button>
-          
-              <div id="ga-result"></div>
-          
-              <div class="chart-container">
-                <canvas id="fitnessChart"></canvas>
-              </div>
-          </div>
       </div>
-  </div>
-    <div id="app"></div>
-
+    </div>
 
     <div id="toast-container"></div>
-
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+
+
+
+
+

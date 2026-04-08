@@ -21,3 +21,4 @@ const analytics = getAnalytics(app);
 
 export const db = getFirestore(app);
 export { collection, addDoc, serverTimestamp };
+

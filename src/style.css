@@ -461,3 +461,100 @@ td {
   border: 1px solid #eee;
 }
 
+
+
+
+#heuristics-vote-section {
+  padding: 20px;
+  animation: fadeIn 0.5s ease;
+}
+
+/* Сітка для карток евристик */
+.heuristics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+
+/* Стиль кожної картки */
+.heuristic-card {
+  background: white;
+  border: 2px solid #eee;
+  border-radius: 12px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.heuristic-card:hover {
+  transform: translateY(-3px);
+  border-color: #a29bfe;
+  box-shadow: 0 5px 15px rgba(108, 92, 231, 0.1);
+}
+
+/* Активний стан (коли обрано) */
+.heuristic-card.active {
+  border-color: #6c5ce7;
+  background-color: #f8f7ff;
+  box-shadow: 0 8px 20px rgba(108, 92, 231, 0.15);
+}
+
+.heuristic-card.active::after {
+  content: "✓";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #6c5ce7;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* Текст всередині картки */
+.heuristic-card strong {
+  color: #2d3436;
+  font-size: 1.1em;
+}
+
+.heuristic-card p {
+  color: #636e72;
+  font-size: 0.9em;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Кнопка відправки */
+#submit-heuristics-btn {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+#submit-heuristics-btn:disabled {
+  background: #dfe6e9;
+  color: #b2bec3;
+  cursor: not-allowed;
+}
+
+#submit-heuristics-btn:not(:disabled):hover {
+  box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
+  opacity: 0.9;
+}
