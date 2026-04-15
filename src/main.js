@@ -1,6 +1,6 @@
 import { db, collection, addDoc, serverTimestamp } from './firebase.js';
 import { getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore"; 
-import { AntRanking } from './aco.js';
+import { AntRanking, generateRandomPermutations } from './aco.js';
 import './style.css';
 
 const desserts = [
@@ -438,43 +438,96 @@ async function loadAdminData() {
         winnersHtml += '</tbody></table>';
 
         // 6. Мурашиний алгоритм (ACO)
-        const expertVotes = allVotes.map(v => v.ranking).filter(r => r);
-        const winnersNames = winners.map(w => w.name);
-        let acoHtml = '';
+        // Беремо ТОП-10 за балами
+        const top10 = desserts
+            .map(name => ({ name, score: scores[name] }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10)
+            .map(item => item.name);
 
-        if (winnersNames.length > 0) {
-            const aco = new AntRanking(winnersNames, expertVotes);
-            const { best, history } = aco.solve();
+        // Генеруємо 20 випадкових перестановок
+        const randomPerms = generateRandomPermutations(top10, 20);
 
-            acoHtml += '<h3>Фінальний консенсус-рейтинг (ACO)</h3>' +
-                '<table class="results-table"><thead><tr><th>Місце</th><th>Об\'єкт</th></tr></thead><tbody>';
-            best.forEach((name, i) => {
-                acoHtml += `<tr><td><b>#${i + 1}</b></td><td>${name}</td></tr>`;
+        let acoHtml = '<h3>🐜 Мурашиний алгоритм (ACO)</h3>';
+
+        // Таблиця з 20 перестановками
+        acoHtml += '<h4>20 випадкових перестановок ТОП-10 об\'єктів</h4>';
+        acoHtml += '<div style="overflow-x:auto"><table class="results-table"><thead><tr><th>#</th>';
+        top10.forEach((_, i) => acoHtml += `<th>Поз. ${i+1}</th>`);
+        acoHtml += '</tr></thead><tbody>';
+        randomPerms.forEach((perm, i) => {
+            acoHtml += `<tr><td><b>${i+1}</b></td>${perm.map(name => `<td>${name}</td>`).join('')}</tr>`;
+        });
+        acoHtml += '</tbody></table></div>';
+
+        // ACO з відстанню Кука
+        const acoCook = new AntRanking(top10, randomPerms, 'cook');
+        const resultCook = acoCook.solve();
+
+        acoHtml += '<h4>Оптимальна перестановка за відстанню Кука</h4>';
+        acoHtml += `<p style="font-size:0.85rem; color:#555;">Сума відстаней Кендалла до всіх 20 перестановок: <b>${resultCook.distance}</b></p>`;
+        acoHtml += '<table class="results-table"><thead><tr><th>Місце</th><th>Об\'єкт</th></tr></thead><tbody>';
+        resultCook.best.forEach((name, i) => {
+            acoHtml += `<tr><td><b>#${i+1}</b></td><td>${name}</td></tr>`;
+        });
+        acoHtml += '</tbody></table>';
+        acoHtml += '<h4>Графік збіжності (відстань Кука)</h4>';
+        acoHtml += '<div style="height:260px; margin-bottom:24px;"><canvas id="acoChartCook"></canvas></div>';
+
+        // ACO з відстанню мінімакс
+        const acoMinimax = new AntRanking(top10, randomPerms, 'minimax');
+        const resultMinimax = acoMinimax.solve();
+
+        acoHtml += '<h4>Оптимальна перестановка за відстанню мінімакс</h4>';
+        acoHtml += `<p style="font-size:0.85rem; color:#555;">Максимальна відстань Кендалла серед усіх 20 перестановок: <b>${resultMinimax.distance}</b></p>`;
+        acoHtml += '<table class="results-table"><thead><tr><th>Місце</th><th>Об\'єкт</th></tr></thead><tbody>';
+        resultMinimax.best.forEach((name, i) => {
+            acoHtml += `<tr><td><b>#${i+1}</b></td><td>${name}</td></tr>`;
+        });
+        acoHtml += '</tbody></table>';
+        acoHtml += '<h4>Графік збіжності (мінімакс)</h4>';
+        acoHtml += '<div style="height:260px; margin-bottom:40px;"><canvas id="acoChartMinimax"></canvas></div>';
+
+        // Відмалювати обидва графіки після рендеру
+        setTimeout(() => {
+        const ctxCook = document.getElementById('acoChartCook')?.getContext('2d');
+        if (ctxCook) {
+            new Chart(ctxCook, {
+                type: 'line',
+                data: {
+                    labels: resultCook.history.map((_, i) => i + 1),
+                    datasets: [{
+                        label: 'Відстань Кука',
+                        data: resultCook.history,
+                        borderColor: '#6c5ce7',
+                        backgroundColor: 'rgba(108,92,231,0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
             });
-            acoHtml += '</tbody></table>';
-
-            acoHtml += '<h3>Графік збіжності мурашиного алгоритму</h3>' +
-                '<div style="height:300px; width:100%; margin-bottom: 50px;"><canvas id="acoChart"></canvas></div>';
-
-            setTimeout(() => {
-                const acoCtx = document.getElementById('acoChart').getContext('2d');
-                new Chart(acoCtx, {
-                    type: 'line',
-                    data: {
-                        labels: history.map((_, i) => i + 1),
-                        datasets: [{
-                            label: 'Відстань (Якість)',
-                            data: history,
-                            borderColor: '#e17055',
-                            backgroundColor: 'rgba(225, 112, 85, 0.1)',
-                            fill: true,
-                            tension: 0.3
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
-            }, 200);
         }
+
+        const ctxMinimax = document.getElementById('acoChartMinimax')?.getContext('2d');
+        if (ctxMinimax) {
+            new Chart(ctxMinimax, {
+                type: 'line',
+                data: {
+                    labels: resultMinimax.history.map((_, i) => i + 1),
+                    datasets: [{
+                        label: 'Мінімакс відстань',
+                        data: resultMinimax.history,
+                        borderColor: '#e17055',
+                        backgroundColor: 'rgba(225,112,85,0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+        }, 300);
 
         // 7. Фінальний вивід
         container.innerHTML =
