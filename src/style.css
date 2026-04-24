@@ -137,24 +137,60 @@ body {
   border: 1px solid #eee;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
 table {
   width: 100%;
+  min-width: 600px; /* Мінімальна ширина, щоб не "ламалося" */
   border-collapse: collapse;
-  min-width: 500px; /* Мінімальна ширина, щоб дані не злипалися */
 }
 
-th {
-  background: #f8f9fa;
-  padding: 12px;
-  text-align: left;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  color: #a0a0a0;
+.table-box {
+  max-width: 650px; /* 🔥 робить вузьким */
+  margin: 20px auto;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
 }
 
-td {
-  padding: 12px;
-  border-bottom: 1px solid #f9f9f9;
+/* саме "віконечко" */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* таблиця може бути ширша */
+.results-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* компактність */
+.results-table th,
+.results-table td {
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* липкий перший стовпчик (дуже зручно) */
+.results-table th:first-child,
+.results-table td:first-child {
+  position: sticky;
+  left: 0;
+  background: white;
+}
+
+th, td {
+  padding: 8px;
+  font-size: 0.85rem;
+  border: 1px solid #eee;
 }
 
 /* Кнопка відправки */
@@ -557,4 +593,79 @@ td {
 #submit-heuristics-btn:not(:disabled):hover {
   box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
   opacity: 0.9;
+}
+
+
+.admin-sub-tab.active {
+  color: #6c5ce7 !important;
+  border-bottom-color: #6c5ce7 !important;
+}
+.admin-sub-tab:hover {
+  color: #6c5ce7 !important;
+  background: #f8f7ff !important;
+  border-radius: 8px 8px 0 0;
+}
+
+
+#run-permutation-btn {
+  width: 100%;
+  max-width: 520px;
+  padding: 14px 18px;
+
+  border: none;
+  border-radius: 14px;
+
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+
+  font-size: 1rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow: 0 10px 20px rgba(108, 92, 231, 0.25);
+
+  transition: all 0.25s ease;
+  margin: 15px 0;
+}
+
+#run-permutation-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(108, 92, 231, 0.35);
+}
+
+#run-permutation-btn:active {
+  transform: translateY(0);
+}
+
+
+#permutation-result {
+  width: 100%;
+  margin-top: 20px;
+
+  background: white;
+  border-radius: 20px;
+
+  padding: 20px;
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  border: 1px solid #eee;
+}
+
+.permutation-header {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+
+  padding: 16px 20px;
+  border-radius: 16px;
+
+  margin-bottom: 15px;
+
+  font-weight: 700;
+}
+
+.permutation-meta {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-top: 4px;
 }

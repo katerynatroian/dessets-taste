@@ -1,6 +1,7 @@
 import { db, collection, addDoc, serverTimestamp } from './firebase.js';
 import { getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore"; 
 import { AntRanking, generateRandomPermutations } from './aco.js';
+import { runLab3Analysis } from './lab3.js';
 import './style.css';
 
 const desserts = [
@@ -154,11 +155,38 @@ window.switchTab = (target) => {
         votingSec?.classList.add('hidden');
         heuristicsSec?.classList.add('hidden');
         document.getElementById('tab-admin')?.classList.add('active');
+        // Show first admin sub-tab (lab1/2)
+        showAdminTab('lab12');
     }
 };
 
 const tabHeuristics = document.getElementById('tab-heuristics');
 if (tabHeuristics) tabHeuristics.onclick = () => switchTab('heuristics');
+
+// --- ADMIN SUB-TABS ---
+window.showAdminTab = function(tab) {
+    const lab12El = document.getElementById('admin-lab12-section');
+    const lab3El = document.getElementById('admin-lab3-section');
+    const btnLab12 = document.getElementById('admin-tab-lab12');
+    const btnLab3 = document.getElementById('admin-tab-lab3');
+
+    if (tab === 'lab12') {
+        lab12El?.classList.remove('hidden');
+        lab3El?.classList.add('hidden');
+        btnLab12?.classList.add('active');
+        btnLab3?.classList.remove('active');
+    } else {
+        lab12El?.classList.add('hidden');
+        lab3El?.classList.remove('hidden');
+        btnLab12?.classList.remove('active');
+        btnLab3?.classList.add('active');
+        // Trigger Lab 3 render if not yet done
+        const container = document.getElementById('lab3-content');
+        if (container && container.dataset.loaded !== 'true') {
+            renderLab3(container);
+        }
+    }
+};
 
 // --- ГОЛОСУВАННЯ ---
 function render() {
@@ -238,6 +266,93 @@ function matchesHeuristic(hId, stat) {
     return false;
 }
 
+// Cached data for Lab 3
+let _cachedVotes = null;
+let _cachedTopObjects = null;
+
+// --- LAB 3 RENDER ---
+async function renderLab3(container) {
+    container.innerHTML = '<p style="text-align:center;padding:20px;color:#636e72">⏳ Обчислення... (може зайняти кілька секунд)</p>';
+    try {
+        let votes = _cachedVotes;
+        let topObjects = _cachedTopObjects;
+
+        if (!votes) {
+            const snap = await getDocs(query(collection(db, "votes"), orderBy("timestamp", "desc")));
+            votes = [];
+            snap.forEach(d => votes.push(d.data()));
+            _cachedVotes = votes;
+        }
+
+        if (!topObjects) {
+            // Recalculate top objects from heuristic filtering (same as Lab 1/2 logic)
+            const snap2 = await getDocs(query(collection(db, "votes_lab2"), orderBy("timestamp", "desc")));
+            const scores = {};
+            const dessertStats = {};
+            desserts.forEach(city => {
+                scores[city] = 0;
+                dessertStats[city] = { pos1: 0, pos2: 0, pos3: 0, total: 0 };
+            });
+
+            votes.forEach(data => {
+                if (data.ranking && Array.isArray(data.ranking)) {
+                    const r = data.ranking;
+                    if (r[0]) { scores[r[0]] += 3; dessertStats[r[0]].pos1++; dessertStats[r[0]].total++; }
+                    if (r[1]) { scores[r[1]] += 2; dessertStats[r[1]].pos2++; dessertStats[r[1]].total++; }
+                    if (r[2]) { scores[r[2]] += 1; dessertStats[r[2]].pos3++; dessertStats[r[2]].total++; }
+                }
+            });
+
+            const hCounts = {};
+            heuristics.forEach(h => hCounts[h.id] = 0);
+            snap2.forEach(d => {
+                const data = d.data();
+                if (data.chosenHeuristics) data.chosenHeuristics.forEach(id => { if (hCounts[id] !== undefined) hCounts[id]++; });
+            });
+
+            const sortedHeuristics = heuristics.map(h => ({ ...h, count: hCounts[h.id] })).sort((a, b) => b.count - a.count);
+            const top3H = sortedHeuristics.slice(0, 3).map(h => h.id);
+
+            let currentSet = [...desserts];
+            top3H.forEach(hId => {
+                currentSet = currentSet.filter(name => !matchesHeuristic(hId, dessertStats[name]));
+            });
+
+
+            // --- ГАРАНТУЄМО РІВНО 10 ОБ'ЄКТІВ (з Лаб 2) ---
+
+            // всі об'єкти, відсортовані за балами
+            const sortedByScore = desserts
+                .map(n => ({ n, s: scores[n] }))
+                .sort((a, b) => b.s - a.s)
+                .map(x => x.n);
+
+            // якщо після евристик >= 10 → беремо топ 10 з них
+            if (currentSet.length >= 10) {
+                currentSet = currentSet
+                    .sort((a, b) => scores[b] - scores[a])
+                    .slice(0, 10);
+            } 
+            else {
+                // якщо менше 10 → ДОБИРАЄМО до 10
+                const missing = sortedByScore.filter(x => !currentSet.includes(x));
+                currentSet = [...currentSet, ...missing].slice(0, 10);
+            }
+
+            topObjects = currentSet;
+            _cachedTopObjects = topObjects;
+        }
+
+        // Run analysis (CPU-intensive, runs synchronously)
+        runLab3Analysis(votes, desserts, topObjects, container);
+        container.dataset.loaded = 'true';
+    } catch (e) {
+        console.error('Lab3 error:', e);
+        container.innerHTML = `<p style="color:red">Помилка при виконанні аналізу Лаб 3: ${e.message}</p>`;
+    }
+
+}
+
 // --- АДМІНКА ---
 async function loadAdminData() {
     const container = document.getElementById('lab2-analysis-container');
@@ -246,6 +361,12 @@ async function loadAdminData() {
 
     container.innerHTML = '<p>Обробка аналітичних даних...</p>';
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Завантаження...</td></tr>';
+
+    // Reset Lab 3 cache to force re-render with fresh data
+    _cachedVotes = null;
+    _cachedTopObjects = null;
+    const lab3Container = document.getElementById('lab3-content');
+    if (lab3Container) lab3Container.dataset.loaded = '';
 
     try {
         const snap1 = await getDocs(query(collection(db, "votes"), orderBy("timestamp", "desc")));
@@ -340,7 +461,6 @@ async function loadAdminData() {
             'Таблиця показує тих, хто <b>залишився</b> після відсіву, відсортованих за балом.</p>';
 
         heuristics.forEach(h => {
-            // Залишаємо лише тих, хто НЕ підпадає під евристику
             const survived = desserts
                 .filter(name => !matchesHeuristic(h.id, dessertStats[name]))
                 .map(name => ({
@@ -438,19 +558,16 @@ async function loadAdminData() {
         winnersHtml += '</tbody></table>';
 
         // 6. Мурашиний алгоритм (ACO)
-        // Беремо ТОП-10 за балами
         const top10 = desserts
             .map(name => ({ name, score: scores[name] }))
             .sort((a, b) => b.score - a.score)
             .slice(0, 10)
             .map(item => item.name);
 
-        // Генеруємо 20 випадкових перестановок
         const randomPerms = generateRandomPermutations(top10, 20);
 
-        let acoHtml = '<h3>🐜 Мурашиний алгоритм (ACO)</h3>';
+        let acoHtml = '<h3>Мурашиний алгоритм (ACO)</h3>';
 
-        // Таблиця з 20 перестановками
         acoHtml += '<h4>20 випадкових перестановок ТОП-10 об\'єктів</h4>';
         acoHtml += '<div style="overflow-x:auto"><table class="results-table"><thead><tr><th>#</th>';
         top10.forEach((_, i) => acoHtml += `<th>Поз. ${i+1}</th>`);
@@ -460,7 +577,6 @@ async function loadAdminData() {
         });
         acoHtml += '</tbody></table></div>';
 
-        // ACO з відстанню Кука
         const acoCook = new AntRanking(top10, randomPerms, 'cook');
         const resultCook = acoCook.solve();
 
@@ -474,7 +590,6 @@ async function loadAdminData() {
         acoHtml += '<h4>Графік збіжності (відстань Кука)</h4>';
         acoHtml += '<div style="height:260px; margin-bottom:24px;"><canvas id="acoChartCook"></canvas></div>';
 
-        // ACO з відстанню мінімакс
         const acoMinimax = new AntRanking(top10, randomPerms, 'minimax');
         const resultMinimax = acoMinimax.solve();
 
@@ -488,7 +603,6 @@ async function loadAdminData() {
         acoHtml += '<h4>Графік збіжності (мінімакс)</h4>';
         acoHtml += '<div style="height:260px; margin-bottom:40px;"><canvas id="acoChartMinimax"></canvas></div>';
 
-        // Відмалювати обидва графіки після рендеру
         setTimeout(() => {
         const ctxCook = document.getElementById('acoChartCook')?.getContext('2d');
         if (ctxCook) {
@@ -529,14 +643,13 @@ async function loadAdminData() {
         }
         }, 300);
 
-        // 7. Фінальний вивід
         container.innerHTML =
-            lab2Html +              // Протокол евристик
-            heuristicsPopHtml +     // Рейтинг популярності евристик
-            heuristicsResultsHtml + // Таблиці по кожній евристиці (залишені після відсіву)
-            winnersHtml +           // Послідовний відсів ТОП-3 евристик
-            matrixHtml +            // Матриця переваг
-            acoHtml;                // ACO + графік
+            lab2Html +
+            heuristicsPopHtml +
+            heuristicsResultsHtml +
+            winnersHtml +
+            matrixHtml +
+            acoHtml;
 
         updateChart(allVotes);
 
