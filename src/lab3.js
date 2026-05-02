@@ -129,7 +129,7 @@ function buildTables(experts, topObjects, workerResult, stats) {
     }
     t4 += '</tr>';
 
-    first30.forEach(function(row, ri) {
+    first30.forEach(function (row, ri) {
         var isMinS = row.sum === minSum;
         var isMinM = row.max === minMax;
         var rowStyle = isMinS ? 'background:#e8f5e9;font-weight:bold'
@@ -138,7 +138,7 @@ function buildTables(experts, topObjects, workerResult, stats) {
         t4 += '<tr style="' + rowStyle + '">';
         t4 += '<td>' + (ri + 1) + '</td>';
 
-        topObjects.forEach(function(obj) {
+        topObjects.forEach(function (obj) {
             t4 += '<td>' + (row.perm.indexOf(obj) + 1) + '</td>';
         });
 
@@ -159,7 +159,7 @@ function buildTables(experts, topObjects, workerResult, stats) {
     );
 
     var legendHtml = '<p style="font-size:0.78rem;color:#636e72;margin:4px 0 20px;padding:0 4px">';
-    topObjects.forEach(function(obj, i) {
+    topObjects.forEach(function (obj, i) {
         legendHtml += '<b>О' + (i + 1) + '</b>=' + obj + (i < topObjects.length - 1 ? ', ' : '');
     });
     legendHtml += '</p>';
@@ -170,10 +170,10 @@ function buildTables(experts, topObjects, workerResult, stats) {
     for (var ei5 = 0; ei5 < showExpCount; ei5++) t5 += '<th>' + experts[ei5].id + '</th>';
     t5 += '<th style="background:#e8f5e9">сума</th></tr>';
 
-    mediansCook.forEach(function(med, i) {
+    mediansCook.forEach(function (med, i) {
         t5 += '<tr style="background:#e8f5e9">';
         t5 += '<td>' + (i + 1) + '</td>';
-        var rankStr = med.perm.map(function(obj, pi) {
+        var rankStr = med.perm.map(function (obj, pi) {
             return '<b>' + (pi + 1) + '.</b>' + obj;
         }).join(' &#8250; ');
         t5 += '<td style="font-size:0.82rem;text-align:left">' + rankStr + '</td>';
@@ -196,10 +196,10 @@ function buildTables(experts, topObjects, workerResult, stats) {
     for (var ei6 = 0; ei6 < showExpCount; ei6++) t6 += '<th>' + experts[ei6].id + '</th>';
     t6 += '<th style="background:#fff3e0">макс</th></tr>';
 
-    mediansMinimax.forEach(function(med, i) {
+    mediansMinimax.forEach(function (med, i) {
         t6 += '<tr style="background:#fff3e0">';
         t6 += '<td>' + (i + 1) + '</td>';
-        var rankStr = med.perm.map(function(obj, pi) {
+        var rankStr = med.perm.map(function (obj, pi) {
             return '<b>' + (pi + 1) + '.</b>' + obj;
         }).join(' &#8250; ');
         t6 += '<td style="font-size:0.82rem;text-align:left">' + rankStr + '</td>';
@@ -216,7 +216,7 @@ function buildTables(experts, topObjects, workerResult, stats) {
         t6
     );
 
- 
+
 
     return table4 + legendHtml + table5 + table6;
 }
@@ -225,33 +225,33 @@ function buildTables(experts, topObjects, workerResult, stats) {
 function buildStaticTables(experts, topObjects, stats) {
     var t1 = '';
     t1 += '<tr><th>Експерти</th>';
-    experts.forEach(function(e) { t1 += '<td>' + e.id + '</td>'; });
+    experts.forEach(function (e) { t1 += '<td>' + e.id + '</td>'; });
     t1 += '</tr>';
-    ['ranking[0]', 'ranking[1]', 'ranking[2]'].forEach(function(_, pos) {
+    ['ranking[0]', 'ranking[1]', 'ranking[2]'].forEach(function (_, pos) {
         t1 += '<tr><th>' + (pos + 1) + ' місце</th>';
-        experts.forEach(function(e) { t1 += '<td>' + (e.ranking[pos] || '-') + '</td>'; });
+        experts.forEach(function (e) { t1 += '<td>' + (e.ranking[pos] || '-') + '</td>'; });
         t1 += '</tr>';
     });
     var table1 = wrapTable('Таблиця 1 — Множинні порівняння', t1);
 
     var t2 = '';
     t2 += '<tr><th>Об\'єкт</th>';
-    topObjects.forEach(function(o) { t2 += '<th>' + o + '</th>'; });
+    topObjects.forEach(function (o) { t2 += '<th>' + o + '</th>'; });
     t2 += '</tr>';
-    [['1 місце', 'pos1'], ['2 місце', 'pos2'], ['3 місце', 'pos3'], ['Всього', 'total']].forEach(function(pair) {
+    [['1 місце', 'pos1'], ['2 місце', 'pos2'], ['3 місце', 'pos3'], ['Всього', 'total']].forEach(function (pair) {
         t2 += '<tr><th>' + pair[0] + '</th>';
-        topObjects.forEach(function(o) { t2 += '<td>' + stats[o][pair[1]] + '</td>'; });
+        topObjects.forEach(function (o) { t2 += '<td>' + stats[o][pair[1]] + '</td>'; });
         t2 += '</tr>';
     });
     var table2 = wrapTable("Таблиця 2 — Частота вибору об'єктів", t2);
 
     var t3 = '';
     t3 += '<tr><th>Об\'єкт \\ Експерт</th>';
-    experts.forEach(function(e) { t3 += '<th>' + e.id + '</th>'; });
+    experts.forEach(function (e) { t3 += '<th>' + e.id + '</th>'; });
     t3 += '</tr>';
-    topObjects.forEach(function(obj) {
+    topObjects.forEach(function (obj) {
         t3 += '<tr><td><b>' + obj + '</b></td>';
-        experts.forEach(function(e) {
+        experts.forEach(function (e) {
             var idx = e.ranking.indexOf(obj);
             t3 += '<td>' + (idx >= 0 ? idx + 1 : 0) + '</td>';
         });
@@ -263,18 +263,18 @@ function buildStaticTables(experts, topObjects, stats) {
 }
 
 // ── Main export (returns Promise) ─────────────────────────────────────────────
-export function runLab3Analysis(votes, allObjects, topObjects, container) {
+export function runLab3Analysis(votes, allObjects, topObjects, container, isAppending = false, skipStaticTables = false) {
     var experts = [];
     var stats = {};
 
-    topObjects.forEach(function(obj) {
+    topObjects.forEach(function (obj) {
         stats[obj] = { pos1: 0, pos2: 0, pos3: 0, total: 0 };
     });
 
-    votes.forEach(function(v) {
+    votes.forEach(function (v) {
         if (!v.ranking) return;
         experts.push({ id: v.expert_id, ranking: v.ranking });
-        v.ranking.forEach(function(obj, i) {
+        v.ranking.forEach(function (obj, i) {
             if (!stats[obj]) return;
             if (i === 0) stats[obj].pos1++;
             if (i === 1) stats[obj].pos2++;
@@ -283,19 +283,28 @@ export function runLab3Analysis(votes, allObjects, topObjects, container) {
         });
     });
 
-    // Render tables 1-3 immediately
-    var staticHtml = buildStaticTables(experts, topObjects, stats);
+    // Render tables 1-3 immediately (unless skipped)
+    var staticHtml = skipStaticTables ? '' : buildStaticTables(experts, topObjects, stats);
     var loaderId = 'lab3-loader-' + Date.now();
-    container.innerHTML = staticHtml +
+    
+    var initialContent = staticHtml +
         '<div id="' + loaderId + '" style="' +
         'text-align:center;padding:32px;background:#f8f7ff;border-radius:16px;margin:16px 0">' +
         '<div style="font-size:1.1rem;color:#6c5ce7;font-weight:600;margin-bottom:8px">' +
-        '⏳ Обчислення 10! = 3&nbsp;628&nbsp;800 перестановок...</div>' +
-        '<div style="font-size:0.85rem;color:#636e72">Це може зайняти 5–30 секунд залежно від пристрою</div>' +
+        '⏳ Обчислення ' + topObjects.length + '! перестановок...</div>' +
+        '<div style="font-size:0.85rem;color:#636e72">Це може зайняти час залежно від кількості об\'єктів</div>' +
         '<div style="margin-top:12px;height:4px;background:#eee;border-radius:2px;overflow:hidden">' +
         '<div style="height:100%;background:#6c5ce7;border-radius:2px;animation:lab3progress 3s linear infinite"></div>' +
         '</div></div>' +
         '<style>@keyframes lab3progress{0%{width:0%}100%{width:100%}}</style>';
+
+    if (isAppending) {
+        var subContainer = document.createElement('div');
+        subContainer.innerHTML = '<h3>Прямий перебір для обраних параметрів</h3>' + initialContent;
+        container.appendChild(subContainer);
+    } else {
+        container.innerHTML = initialContent;
+    }
 
     // Spin up a Web Worker from a Blob URL
     var blob = new Blob([WORKER_SRC], { type: 'application/javascript' });
@@ -304,10 +313,10 @@ export function runLab3Analysis(votes, allObjects, topObjects, container) {
 
     worker.postMessage({
         topObjects: topObjects,
-        expertRankings: experts.map(function(e) { return e.ranking; })
+        expertRankings: experts.map(function (e) { return e.ranking; })
     });
 
-    worker.onmessage = function(e) {
+    worker.onmessage = function (e) {
         worker.terminate();
         URL.revokeObjectURL(workerUrl);
 
@@ -318,7 +327,7 @@ export function runLab3Analysis(votes, allObjects, topObjects, container) {
         }
     };
 
-    worker.onerror = function(err) {
+    worker.onerror = function (err) {
         worker.terminate();
         URL.revokeObjectURL(workerUrl);
         var loaderEl = document.getElementById(loaderId);

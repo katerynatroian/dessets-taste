@@ -1,99 +1,128 @@
 <!DOCTYPE html>
 <html lang="uk">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Експертне оцінювання: смаки тортиків</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <div class="app-card">
-      <nav class="nav-tabs">
-          <button id="tab-voting" class="active">Лаб 1: Голосування</button>
-          <button id="tab-heuristics">Лаб 2: Евристики</button>
-          <button id="tab-admin">Адмінка</button>
-      </nav>
-  
-      <div id="voting-section">
-          <div class="user-badge" id="user-display">Завантаження...</div>
-          <h1>Оберіть ваші 3 улюблені смаки тортиків</h1>
-          <div id="app"></div>
-          <button id="submit-btn" disabled>Оберіть 3 міста</button>
-      </div>
+        <nav class="nav-tabs">
+            <button id="tab-voting" class="active">Лаб 1: Голосування</button>
+            <button id="tab-heuristics">Лаб 2: Евристики</button>
+            <button id="tab-lab4">Лаб 4</button>
+            <button id="tab-admin">Адмінка</button>
+        </nav>
 
-      <section id="heuristics-vote-section" class="hidden">
-          <h1>Лаб 2: Вибір евристик для відсіювання</h1>
-          <p>Оберіть 2-3 евристики, які слід застосувати першими</p>
-          <div id="heuristics-list" class="heuristics-grid"></div>
-          <button id="submit-heuristics-btn" disabled>Відправити вибір евристик</button>
-      </section>
-
-      <div id="password-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-          <h3>Доступ до адмін-панелі</h3>
-          <p>Будь ласка, введіть пароль адміністратора</p>
-          <input type="password" id="admin-pass-input" placeholder="Пароль..." />
-          <div class="modal-actions">
-            <button id="modal-cancel">Скасувати</button>
-            <button id="modal-confirm">Увійти</button>
-          </div>
+        <div id="voting-section">
+            <div class="user-badge" id="user-display">Завантаження...</div>
+            <h1>Оберіть ваші 3 улюблені смаки тортиків</h1>
+            <div id="app"></div>
+            <button id="submit-btn" disabled>Оберіть 3 міста</button>
         </div>
-      </div>
-  
-      <div id="admin-section" class="hidden">
-          <h2>Адміністративна панель</h2>
 
-          <!-- Admin sub-tabs -->
-          <nav class="admin-sub-tabs" style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #eee;padding-bottom:0">
-              <button id="admin-tab-lab12" class="admin-sub-tab active" onclick="showAdminTab('lab12')"
-                  style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:0.95rem;font-weight:600;color:#636e72;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s">
-                  Лаб 1 &amp; 2
-              </button>
-              <button id="admin-tab-lab3" class="admin-sub-tab" onclick="showAdminTab('lab3')"
-                  style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:0.95rem;font-weight:600;color:#636e72;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s">
-                  Лаб №3
-              </button>
-          </nav>
+        <section id="heuristics-vote-section" class="hidden">
+            <h1>Лаб 2: Вибір евристик для відсіювання</h1>
+            <p>Оберіть 2-3 евристики, які слід застосувати першими</p>
+            <div id="heuristics-list" class="heuristics-grid"></div>
+            <button id="submit-heuristics-btn" disabled>Відправити вибір евристик</button>
+        </section>
 
-          <!-- Lab 1 & 2 section -->
-          <div id="admin-lab12-section">
-              <div id="lab2-analysis-container"></div>
+        <section id="lab4-section" class="hidden"></section>
 
-              <div style="position: relative; width: 100%; height: 400px; background: white; padding: 20px; border-radius: 20px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-                  <canvas id="resultsChart"></canvas>
-              </div>
+        <div id="password-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Доступ до адмін-панелі</h3>
+                <p>Будь ласка, введіть пароль адміністратора</p>
+                <input type="password" id="admin-pass-input" placeholder="Пароль..." />
+                <div class="modal-actions">
+                    <button id="modal-cancel">Скасувати</button>
+                    <button id="modal-confirm">Увійти</button>
+                </div>
+            </div>
+        </div>
 
-              <div class="table-card">
-                  <div class="table-wrapper">
-                      <table>
-                          <thead>
-                              <tr>
-                                  <th>Експерт</th>
-                                  <th>Вибір (1-3 місця)</th>
-                                  <th>Дата та час</th>
-                                  <th>Дія</th> 
-                              </tr>
-                          </thead>
-                          <tbody id="admin-tbody"></tbody>
-                      </table>
-                  </div>
-              </div>
-          </div>
+        <div id="admin-section" class="hidden">
+            <h2>Адміністративна панель</h2>
 
-          <!-- Lab 3 section -->
-          <div id="admin-lab3-section" class="hidden">
-              <div style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);border-radius:16px;padding:20px 24px;margin-bottom:24px;color:#fff">
-                  <h2 style="margin:0 0 6px;font-size:1.3rem">Лабораторна робота №3</h2>
-                  <p style="margin:0;opacity:0.9;font-size:0.9rem">Визначення колективного ранжування об'єктів</p>
-              </div>
-              <div id="lab3-content">
-                  <p style="text-align:center;color:#636e72;padding:40px">Натисніть на вкладку "Лабораторна №3" для завантаження аналізу.</p>
-              </div>
-          </div>
-      </div>
+            <!-- Admin sub-tabs -->
+            <nav class="admin-sub-tabs"
+                style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid #eee;padding-bottom:0">
+                <button id="admin-tab-lab12" class="admin-sub-tab active" onclick="showAdminTab('lab12')"
+                    style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:0.95rem;font-weight:600;color:#636e72;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s">
+                    Лаб 1 &amp; 2
+                </button>
+                <button id="admin-tab-lab3" class="admin-sub-tab" onclick="showAdminTab('lab3')"
+                    style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:0.95rem;font-weight:600;color:#636e72;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all 0.2s">
+                    Лаб №3
+                </button>
+            </nav>
+
+            <!-- Lab 1 & 2 section -->
+            <div id="admin-lab12-section">
+                <div id="lab2-analysis-container"></div>
+
+                <div
+                    style="position: relative; width: 100%; height: 400px; background: white; padding: 20px; border-radius: 20px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                    <canvas id="resultsChart"></canvas>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Експерт</th>
+                                    <th>Вибір (1-3 місця)</th>
+                                    <th>Дата та час</th>
+                                    <th>Дія</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lab 3 section -->
+            <div id="admin-lab3-section" class="hidden">
+                <div
+                    style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);border-radius:16px;padding:20px 24px;margin-bottom:24px;color:#fff">
+                    <h2 style="margin:0 0 6px;font-size:1.3rem">Лабораторна робота №3</h2>
+                    <p style="margin:0;opacity:0.9;font-size:0.9rem">Визначення колективного ранжування об'єктів (Мурашиний алгоритм)</p>
+                </div>
+
+                <!--<div style="background:white;border-radius:12px;padding:20px;margin-bottom:24px;box-shadow:0 4px 12px rgba(0,0,0,0.05);display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;">
+                    <div style="flex:1;min-width:200px;">
+                        <label for="lab3-num-objects" style="display:block;font-size:0.9rem;font-weight:600;margin-bottom:8px;color:#2d3436;">Кількість об'єктів (3-10):</label>
+                        <input type="number" id="lab3-num-objects" min="3" max="10" value="10" style="width:100%;padding:10px;border:1px solid #dfe6e9;border-radius:8px;font-size:1rem;">
+                    </div>
+                    <div style="flex:1;min-width:200px;">
+                        <label for="lab3-num-experts" style="display:block;font-size:0.9rem;font-weight:600;margin-bottom:8px;color:#2d3436;">Кількість експертів (3-200):</label>
+                        <input type="number" id="lab3-num-experts" min="3" max="200" value="20" style="width:100%;padding:10px;border:1px solid #dfe6e9;border-radius:8px;font-size:1rem;">
+                    </div>
+                    <div style="display:flex; gap:12px;">
+                        <button id="btn-run-lab3-aco" style="padding:10px 24px;background:#6c5ce7;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(108,92,231,0.3);">
+                            Розрахувати ACO
+                        </button>
+                        <button id="btn-run-lab3-exhaustive" style="padding:10px 24px;background:#00b894;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(0,184,148,0.3);">
+                            Прямий перебір
+                        </button>
+                    </div>
+                </div>-->
+
+                <div id="lab3-content">
+                    <p style="text-align:center;color:#636e72;padding:40px">Оберіть параметри та натисніть "Розрахувати ACO" для побудови перестановок.</p>
+                </div>
+            </div>
+        </div>
     </div>
 
 
     <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
