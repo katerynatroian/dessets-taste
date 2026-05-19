@@ -3,6 +3,8 @@ import { getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore";
 import { AntRanking, generateRandomPermutations } from './aco.js';
 import { runLab3Analysis } from './lab3.js';
 import { buildLab4Sections } from './lab4ui.js';
+import { buildSR1 } from '../sr1.js';
+import { buildSR2 } from '../sr2.js';
 import './style.css';
 
 const desserts = [
@@ -135,6 +137,10 @@ passwordModal.onclick = (e) => { if (e.target === passwordModal) closeModal(); }
 tabVoting.onclick = () => switchTab('voting');
 const tabLab4 = document.getElementById('tab-lab4');
 if (tabLab4) tabLab4.onclick = () => switchTab('lab4');
+const tabSR1 = document.getElementById('tab-sr1');
+if (tabSR1) tabSR1.onclick = () => switchTab('sr1');
+const tabSR2 = document.getElementById('tab-sr2');
+if (tabSR2) tabSR2.onclick = () => switchTab('sr2');
 
 window.switchTab = (target) => {
     const votingSec = document.getElementById('voting-section');
@@ -160,14 +166,36 @@ window.switchTab = (target) => {
         votingSec?.classList.add('hidden');
         heuristicsSec?.classList.add('hidden');
         lab4Sec?.classList.remove('hidden');
+        document.getElementById('sr1-section')?.classList.add('hidden');
+        document.getElementById('sr2-section')?.classList.add('hidden');
         adminSec?.classList.add('hidden');
         document.getElementById('tab-lab4')?.classList.add('active');
         renderLab4(lab4Sec);
+    } else if (target === 'sr1') {
+        votingSec?.classList.add('hidden');
+        heuristicsSec?.classList.add('hidden');
+        lab4Sec?.classList.add('hidden');
+        document.getElementById('sr1-section')?.classList.remove('hidden');
+        document.getElementById('sr2-section')?.classList.add('hidden');
+        adminSec?.classList.add('hidden');
+        document.getElementById('tab-sr1')?.classList.add('active');
+        renderSR1(document.getElementById('sr1-section'));
+    } else if (target === 'sr2') {
+        votingSec?.classList.add('hidden');
+        heuristicsSec?.classList.add('hidden');
+        lab4Sec?.classList.add('hidden');
+        document.getElementById('sr1-section')?.classList.add('hidden');
+        document.getElementById('sr2-section')?.classList.remove('hidden');
+        adminSec?.classList.add('hidden');
+        document.getElementById('tab-sr2')?.classList.add('active');
+        renderSR2(document.getElementById('sr2-section'));
     } else if (target === 'admin') {
         adminSec?.classList.remove('hidden');
         votingSec?.classList.add('hidden');
         heuristicsSec?.classList.add('hidden');
         lab4Sec?.classList.add('hidden');
+        document.getElementById('sr1-section')?.classList.add('hidden');
+        document.getElementById('sr2-section')?.classList.add('hidden');
         document.getElementById('tab-admin')?.classList.add('active');
         // Show first admin sub-tab (lab1/2)
         showAdminTab('lab12');
@@ -365,6 +393,33 @@ async function renderLab4(container) {
     } catch (e) {
         console.error('Lab4 error:', e);
         container.innerHTML = `<p style="color:red;padding:20px">Помилка завантаження Лаб 4: ${e.message}</p>`;
+    }
+}
+
+// --- SR1 RENDER ---
+async function renderSR1(container) {
+    if (container.dataset.loaded === 'true') return;
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#636e72">⏳ Завантаження СР №1...</p>';
+    try {
+        const top10 = await getTopObjects();
+        buildSR1(container, top10);
+        container.dataset.loaded = 'true';
+    } catch (e) {
+        console.error('SR1 error:', e);
+        container.innerHTML = `<p style="color:red;padding:20px">Помилка завантаження СР №1: ${e.message}</p>`;
+    }
+}
+
+// --- SR2 RENDER ---
+async function renderSR2(container) {
+    if (container.dataset.loaded === 'true') return;
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#636e72">⏳ Завантаження СР №2...</p>';
+    try {
+        buildSR2(container);
+        container.dataset.loaded = 'true';
+    } catch (e) {
+        console.error('SR2 error:', e);
+        container.innerHTML = `<p style="color:red;padding:20px">Помилка завантаження СР №2: ${e.message}</p>`;
     }
 }
 

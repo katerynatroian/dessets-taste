@@ -171,7 +171,13 @@ export class AntRanking {
         }
 
         logs.push(`✅ Завершено. Знайдено найкращих розв'язків: ${bestRankings.length} (d = ${minDistance})`);
-        return { bests: bestRankings, distance: minDistance, history: convergenceHistory, logs: logs };
+        return {
+            best: bestRankings[0] || [],
+            bests: bestRankings,
+            distance: minDistance,
+            history: convergenceHistory,
+            logs: logs
+          };
     }
 
     constructSolution() {
